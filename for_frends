@@ -1,0 +1,424 @@
+#from cgitb import reset
+import re
+import os
+import traceback
+import time
+import datetime
+import string
+import random
+import requests
+
+# bot_Rublev_By_xeLa.py
+
+
+from colorama import Fore
+
+from aiogram import Bot, types
+from aiogram.dispatcher import Dispatcher
+from aiogram.utils import executor
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.contrib.fsm_storage.redis import RedisStorage2
+from aiogram.types import ReplyKeyboardRemove, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+#from asgiref.sync import sync_to_async
+from bs4 import BeautifulSoup as BS
+from datetime import datetime
+
+from threading import Thread as thread
+
+from time import sleep as wait
+
+
+def pairs(obj):
+  return obj.items()
+
+def ipairs(obj):
+  return enumerate(obj)
+
+DEBUG = True
+#токен зонтик тест2
+TOKEN = ""
+
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot, storage=MemoryStorage())
+
+newdate = datetime.now()
+newdate = newdate.strftime("%d.%m.%Y")
+
+
+buttons = {
+  "menu": ReplyKeyboardMarkup(resize_keyboard=True).add(KeyboardButton('Курсы обмена на сегодня')),
+
+  "permutation": [
+    ReplyKeyboardMarkup(resize_keyboard=True).row(KeyboardButton('USDT'), KeyboardButton('EUR'), KeyboardButton('TL')).add(KeyboardButton('Вернуться в меню')),
+  ],
+
+}
+
+def stop():
+  while True:
+    pass
+
+def debug(string):
+  log(string, "debug")
+
+def pairs(obj):
+  return obj.items()
+
+def ipairs(obj):
+  return enumerate(obj)
+
+def log(text, type_log="info"):
+  if type_log == "info":
+    type_color = Fore.LIGHTBLUE_EX
+  elif type_log == "success":
+    type_color = Fore.LIGHTGREEN_EX
+  elif type_log == "error":
+    type_color = Fore.LIGHTRED_EX
+  elif type_log == "warning":
+    type_color = Fore.YELLOW
+  elif type_log == "debug":
+    type_color = Fore.LIGHTCYAN_EX
+
+  if type_log == "debug" and not DEBUG:
+    return
+  if type_log == "warning" and not DEBUG:
+    return
+
+  print(f"{Fore.CYAN}{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{Fore.WHITE} | {type_color}{type_log.title()}{Fore.WHITE} | {Fore.LIGHTBLACK_EX}{text}")
+
+  
+
+# Бот
+
+def main():
+  dp.register_message_handler(FSM.Permutation.Cancel, lambda msg: msg.text.lower() == 'вернуться в меню', state=FSM.Permutation)
+  dp.register_message_handler(FSM.Permutation.getAmount, state=FSM.Permutation.amount)
+  dp.register_message_handler(FSM.Permutation.getTypeCurrency, state=FSM.Permutation.type_currency)
+  dp.register_message_handler(FSM.Permutation.getContacts, state=FSM.Permutation.contacts)
+
+  dp.register_message_handler(FSM.Exchange.Cancel, lambda msg: msg.text.lower() == 'вернуться в меню', state=FSM.Exchange)
+  dp.register_message_handler(FSM.Exchange.getTypeExchange, state=FSM.Exchange.type_exchange)
+  dp.register_message_handler(FSM.Exchange.getAmount, state=FSM.Exchange.amount)
+  dp.register_message_handler(FSM.Exchange.getTypeCurrency, state=FSM.Exchange.type_currency)
+  dp.register_message_handler(FSM.Exchange.getCity, state=FSM.Exchange.city)
+  dp.register_message_handler(FSM.Exchange.getContacts, state=FSM.Exchange.contacts)
+
+  executor.start_polling(dp, skip_updates=True)
+
+@dp.message_handler(commands=["start"])
+async def main_command(msg: types.Message):
+  command = msg.get_command()
+
+  if command == "/start":
+    text = "\
+     \n😎  Самый низкий курс обмена в Турции.\
+     \n🤑  Любые суммы деньги в наличие.\
+     \n🏦  Обмен в офисе и доставка\
+     \n👌  Проверка банкнот на профессиональном оборудовании\
+     \n🇷🇺  Выведем рубли из России выдаем $, Евро, ТL\
+     \n👨‍💻  Переведем любую валюту из любой страны мира, в другую страну\
+     \n🏡  Покупайте недвижимость в Турции? Мы выведем любую сумму!\
+     \n🇹🇷  Наш офис в центре Махмутлара\
+    "
+    await bot.send_photo(chat_id=msg.from_user['id'], photo='https://i.imgur.com/4Yql7s7.jpg')
+    await msg.answer(text, reply_markup=buttons['menu'])
+
+@dp.message_handler(state=None)
+async def main_message(msg: types.Message):
+  if msg.text == "Курсы обмена на сегодня":
+
+    textresult = {}
+
+    # Запрос первого курса для ЛИРЫ 
+    url = 'https://www.bybit.com/fiat/trade/otc/?actionType=1&token=USDT&fiat=RUB&paymentMethod=64'
+
+    headers= {
+        "content-type": "application/json",
+        "x-trace-id": "4c3d6fce-a2d8-421e-9d5b-e0c12bd2c7c0",
+        "x-ui-request-trace": "4c3d6fce-a2d8-421e-9d5b-e0c12bd2c7c0"
+    }
+
+    i = 0
+    integer = 0
+
+    for v in range(1):
+      result = requests.post(url, headers=headers, json={"proMerchantAds":False,"page":v + 1,"rows":10,"payTypes":["TinkoffNew"],"countries":[],"publisherType":None,"asset":"USDT","fiat":"RUB","tradeType":"BUY"}).json()
+
+      for key, item in ipairs(result['data']):
+        print(item['adv']['price'], item['adv']['maxSingleTransAmount'], item['adv']['minSingleTransAmount'])
+        i += 1
+        integer += float(item['adv']['price'])
+
+    print("")
+
+    textresult['tinkoff'] = float(integer) / i
+
+    #await msg.answer(text, reply_markup=buttons['menu'])
+
+    # Запрос второго курса для ЛИРЫ 
+
+    url = 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search'
+ 
+    headers= {
+        "content-type": "application/json",
+        "x-trace-id": "4c3d6fce-a2d8-421e-9d5b-e0c12bd2c7c0",
+        "x-ui-request-trace": "4c3d6fce-a2d8-421e-9d5b-e0c12bd2c7c0"
+    }
+
+    i = 0
+    integer = 0
+
+    for v in range(1):
+      result = requests.post(url,headers=headers,json={"proMerchantAds":False,"page":1,"rows":10,"payTypes":[],"countries":[],"publisherType":None,"asset":"USDT","fiat":"TRY","tradeType":"SELL"}).json()
+
+      for key, item in ipairs(result['data']):
+        print(item['adv']['price'], item['adv']['maxSingleTransAmount'], item['adv']['minSingleTransAmount'])
+        i += 1
+        integer += float(item['adv']['price'])
+
+    print("")
+
+    textresult['zirat'] = float(integer) / i
+
+    textresult['tinkoff'] = round(textresult['tinkoff'], 4)
+    textresult['zirat'] = round(textresult['zirat'], 4)
+    textresult['eur'] = float(textresult['tinkoff']) / float(textresult['zirat'])
+    textresult['eur'] = round(textresult['eur'] + ((textresult['eur'] * 4) / 100), 4)
+    textresult['dollar'] = round(float(textresult['tinkoff']) + (1.3 % float(textresult['tinkoff'])), 4)
+    textresult['dollar2'] = round(float(textresult['tinkoff']) + ( (7 % float(textresult['tinkoff'])) * 1.08), 4)
+
+    result = float()
+    #ПАРСИМ БИНАНС ПЕРВЫЕ 2 СТРАНИЦЫ ИЛИ 20 ПРЕДЛОЖЕНИЙ ПО usdt за рубль тинькоф / НА 20 ПОЛУЧАЕМ СРЕДНИЙ КУРС ОКРУГЛЯЕМ
+    # В БОЛЬШУЮ СТОРОНУ (https://p2p.binance.com/ru/trade/TinkoffNew/USDT?fiat=RUB) ДАЛЕЕ ПРИБАВЛЯЕМ НАШИ 1,3 ПРОЦЕНТА
+    # И ПОЛУЧАЕМ КУРС ДЛЯ КЛИЕНТА ОКРУГЛЯЙ ЦИФРЫ ДО 4 ЗНАКОВ ПОСЛЕ ЗАПЯТОЙ
+    #text = f"Тинькофф: {textresult['tinkoff']} Зират: {textresult['zirat']}"
+
+    text = f"\
+     \n📌Доброго времени суток, актуальные курсы валют на сейчас:\n\
+     \nОтдаете/Получаете = Курс\n\
+     \n💵 ₽🇷🇺 / $🇺🇸    = {textresult['dollar']} ₽\
+     \n💷 ₽🇷🇺 / ₺🇹🇷    = {textresult['eur']} ₽\
+     \n💶 ₽🇷🇺 / €🇪🇺    = {textresult['dollar2']} ₽\
+     \n\
+     \n💰 Тинькоф/Сбербанк, делаете переводы в офисе, либо дистанционный обмен. От 10000 лир доставка по Алании.\n\
+     \n🚗 Выезд в Махмутлар, Алания, Авсаллар\n\
+     \n🏦 Наш офис находится в центре Махмутлара\
+    "
+
+    await msg.answer(text, reply_markup=buttons['menu'])
+
+  
+
+  elif msg.text == "Заявка на обмен в Турции 🇹🇷":
+    await msg.answer("Укажите тип планируемого обмена", reply_markup=buttons['exchange'][0])
+    await FSM.Exchange.type_exchange.set()
+    await dp.storage.wait_closed()
+  elif msg.text == "Меняем RUB на USD, TL, EURO 💰":
+    await msg.answer("⤴️ - Напишите сумму в рублях которую Вы отдаете:", reply_markup=buttons['cancel'])
+    await FSM.Permutation.amount.set()
+    await dp.storage.wait_closed()
+  elif msg.text == "Поддержка 🆘":
+
+    await msg.answer("Задайте вопрос нашим саппортам 💭\n\nНажмите на кнопку 👇", reply_markup=support_button)
+       
+  elif msg.text == "Наши офисы 🏢":
+    await msg.answer("🇹🇷 Пункт выдачи в Махмутлар\
+    \n\
+                     \n⏱ Часы работы с 10:00 до 17:00\
+                     \n⏱ СБ и ВС - по запросу\
+    \n\
+                     \nКонтакты для связи : @xeLabtc\
+    \n\
+ ")
+  else:
+    await msg.answer("Пожалуйста, выберите команду в меню.")
+
+@dp.callback_query_handler(state=None)
+async def main_callback(call: types.CallbackQuery):
+  pass
+
+class FSM:
+  class Exchange(StatesGroup):
+    type_exchange = State()
+    amount = State()
+    type_currency = State()
+    city = State()
+    contacts = State()
+
+    async def Cancel(msg: types.Message, state):
+      text = "\
+        \n😎  Самый низкий курс обмена в Турции.\
+        \n🤑  Любые суммы деньги в наличие.\
+        \n🏦  Обмен в офисе\
+        \n👌  Проверка банкнот на профессиональном оборудовании\
+        \n🇷🇺  Выведем рубли из России выдаем $, Евро, ТL\
+        \n👨‍💻  Переведем любую валюту из любой страны мира, в другую страну\
+        \n🏡  Покупайте недвижимость в Турции? Мы выведем любую сумму!\
+        \n🇹🇷  Наш офис в центре Махмутлара\
+      "
+      await bot.send_photo(chat_id=msg.from_user['id'], photo='https://i.imgur.com/4Yql7s7.jpg')
+      await msg.answer(text, reply_markup=buttons['menu'])
+      await state.finish()
+      await dp.storage.close()
+
+    async def getTypeExchange(msg: types.Message, state):
+      if "Отдаете" in msg.text or "Получаете" in msg.text:
+        async with state.proxy() as data:
+          if "Купить" in msg.text:
+            data['type_exchange_action'] = "продажа"
+          else:
+            data['type_exchange_action'] = "продажа"
+
+          data['type_exchange'] = msg.text.replace("Отдаете", "").replace("Покупаете", "").replace(" ", "")
+
+        await msg.answer("1️⃣  - Введите сумму:", reply_markup=buttons['cancel'])
+        await FSM.Exchange.next()
+        await dp.storage.wait_closed()
+
+    async def getAmount(msg: types.Message, state):
+      if msg.text.isdigit():
+        async with state.proxy() as data:
+          data['amount'] = msg.text
+
+        await msg.answer("2️⃣ - Получаете:", reply_markup=buttons['exchange'][1])
+        await FSM.Exchange.next()
+        await dp.storage.wait_closed()
+      else:
+        await msg.answer("Введите пожалуйста число.")
+
+    async def getTypeCurrency(msg: types.Message, state):
+      async with state.proxy() as data:
+        data['type_currency'] = msg.text
+
+      await msg.answer("3️⃣ - Выберите город и офис:", reply_markup=buttons['exchange'][2])
+      await FSM.Exchange.next()
+      await dp.storage.wait_closed()
+
+    async def getCity(msg: types.Message, state):
+      async with state.proxy() as data:
+        data['city'] = msg.text
+
+      await msg.answer("📲 Оставьте контакты для того что бы мы могли связаться с Вами:", reply_markup=buttons['cancel'])
+      await FSM.Exchange.next()
+      await dp.storage.wait_closed()
+
+    async def getContacts(msg: types.Message, state):
+      async with state.proxy() as data:
+        data['contacts'] = msg.text
+
+      async with state.proxy() as data:
+        result_data = data
+
+      tg_nick = "None"
+
+      if msg.from_user['username']:
+        tg_nick = "@" + msg.from_user['username']
+
+      text = f"💰 Заявка на обмен валют:\
+                       \n\
+                       \nОтдаете {result_data['amount']} {result_data['type_exchange']}\
+                       \n{result_data['type_currency']}\
+                       \n\
+                       \n📯 В городе: {result_data['city']}\
+                       \n☎️ Контакты: {result_data['contacts']}\
+                       \n👨🏻‍💻 Telegram: {tg_nick}\
+                       \n\
+                       \n✅ Ожидайте звонка. Наш мененджер скоро с вами свяжется\
+                       \n\
+                       \n❗️ Пожалуйста не дублируйте заявку"
+                      
+                       
+                     
+
+
+      await msg.answer("\n" + text, reply_markup=buttons['menu'])
+
+      sendMessage("-1001510147149", text)
+
+      await state.finish()
+      await dp.storage.close()
+
+  class Permutation(StatesGroup):
+    amount = State()
+    type_currency = State()
+    contacts = State()
+
+    async def Cancel(msg: types.Message, state):
+      text = "\
+        \n😎  Самый низкий курс обмена в Турции.\
+        \n🤑  Любые суммы деньги в наличие.\
+        \n🏦  Обмен в офисе\
+        \n👌  Проверка банкнот на профессиональном оборудовании\
+        \n🇷🇺  Выведем рубли из России выдаем $, Евро, ТL\
+        \n👨‍💻  Переведем любую валюту из любой страны мира, в другую страну\
+        \n🏡  Покупайте недвижимость в Турции? Мы выведем любую сумму!\
+        \n🇹🇷  Наш офис в центре Махмутлара\
+      "
+      await bot.send_photo(chat_id=msg.from_user['id'], photo='https://i.imgur.com/4Yql7s7.jpg')
+      await msg.answer(text, reply_markup=buttons['menu'])
+      await state.finish()
+      await dp.storage.close()
+
+    async def getAmount(msg: types.Message, state):
+      if msg.text.isdigit():
+        async with state.proxy() as data:
+          data['amount'] = msg.text
+
+        await msg.answer("⤵️ - В какой валюте вы хотите получить свои деньги:", reply_markup=buttons['permutation'][0])
+        await FSM.Permutation.next()
+        await dp.storage.wait_closed()
+      else:
+        await msg.answer("Введите пожалуйста число.")
+
+    async def getTypeCurrency(msg: types.Message, state):
+      async with state.proxy() as data:
+        data['type_currency'] = msg.text
+
+      await msg.answer("📲 Оставьте контакты для того что бы мы могли связаться с Вами:", reply_markup=buttons['cancel'])
+      await FSM.Permutation.next()
+      await dp.storage.wait_closed()
+
+    async def getContacts(msg: types.Message, state):
+      async with state.proxy() as data:
+        data['contacts'] = msg.text
+
+      async with state.proxy() as data:
+        result_data = data
+
+      tg_nick = "N/A"
+
+      if msg.from_user['username']:
+        tg_nick = "@" + msg.from_user['username']
+
+      text = f"💰 Заявка на перестановку валюты из РФ: {result_data['amount']} RUB\
+                       \n⬆️ Оплата - {result_data['type_currency']}\
+                       \n\
+                       \n☎️ Контакты: {result_data['contacts']}\
+                       \n👨🏻‍💻 Telegram: {tg_nick}\
+                       \n\
+                       \n✅ Ожидайте звонка. Наш мененджер скоро с вами свяжется\
+                       \n\
+                       \n❗️ Пожалуйста не дублируйте заявку"
+
+      await msg.answer("\n" + text, reply_markup=buttons['menu'])
+
+      sendMessage("-1001510147149", text)
+      await state.finish()
+      await dp.storage.close()
+      
+
+    
+
+# Функции
+
+def sendMessage(id, text):
+  global TOKEN
+
+  requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage?chat_id={id}&text={text}")
+  
+
+# Запуск бота
+
+main()
